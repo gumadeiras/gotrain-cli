@@ -1,6 +1,6 @@
 # gotrain 🚂
 
-> Atomic CLI for NYC train departures (MTA Subway, LIRR, Metro-North)
+> Atomic CLI for MTA system train departures (NYC Subway, LIRR, Metro-North)
 
 No dependencies. No config. Just trains.
 
@@ -82,7 +82,7 @@ $ gotrain alerts
 
 ## Data Source
 
-Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time NYC transit data.
+Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time MTA transit data.
 
 ## Why?
 
