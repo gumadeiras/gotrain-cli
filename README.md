@@ -8,12 +8,6 @@ No dependencies. No config. Just trains.
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-## Clawdbot Integration
-
-This tool is available as a **ClawdHub skill**! Use it from any chat where Clawdbot is connected.
-
-- **Skill**: [`gotrain`](https://clawdhub.com/skills/gotrain) on ClawdHub
-
 ## Install
 
 ```bash
@@ -76,6 +70,12 @@ $ gotrain alerts
 | `alerts` | Active service alerts |
 | `fav <id>` | Toggle favorite station |
 | `favs` | List favorite stations |
+
+## Clawdbot Integration
+
+This tool is available as a **ClawdHub skill**! Use it from any chat where Clawdbot is connected.
+
+- **Skill**: [`gotrain`](https://clawdhub.com/skills/gotrain) on ClawdHub
 
 ## Data Source
 
