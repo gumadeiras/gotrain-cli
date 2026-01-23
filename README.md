@@ -6,6 +6,16 @@ No dependencies. No config. Just trains.
 
 ![CI](https://img.shields.io/badge/CI-bash--only-yellow)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
+![License](https://img.shields.io/badge/License-MIT-green)
+
+## Clawdbot Integration
+
+This tool is available as a **Clawdbot skill**! Use it from any chat surface where Clawdbot is connected.
+
+- **Skill**: [`gotrain`](https://clawdhub.com/skills/gotrain) on ClawdHub
+- **Docs**: [gotrain Skill](https://docs.clawd.bot/skills/gotrain) in Clawdbot docs
+
+Powered by [Clawdbot](https://clawd.bot) — your personal penguin assistant.
 
 ## Install
 
