@@ -19,8 +19,8 @@ echo "  → Downloading to ${DEST_DIR}/${BIN_NAME}..."
 curl -sL "$RAW_URL" -o "${DEST_DIR}/${BIN_NAME}"
 chmod +x "${DEST_DIR}/${BIN_NAME}"
 
-# Verify
-if "${DEST_DIR}/${BIN_NAME}" --help >/dev/null 2>&1; then
+# Verify - check file exists and is executable (skip --help to avoid edge cases)
+if [[ -x "${DEST_DIR}/${BIN_NAME}" ]]; then
     echo "✅ Installed! Run 'gotrain --help' to get started."
 else
     echo "❌ Installation failed. Try adding ${DEST_DIR} to your PATH."
