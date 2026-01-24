@@ -70,10 +70,10 @@ cmd_stations() {
 
   api_fetch "$endpoint" | jq -r '.[] | "\(.id)|\(.name)|\(.system // "-")"' 2>/dev/null | while IFS='|' read -r id name system; do
     case "$system" in
-      SUBWAY) echo "🟦 SUBWAY | $name" | $id ;;
-      LIRR) echo "🟩 LIRR | $name" | $id ;;
-      MNR) echo "🟥 MNR | $name" | $id ;;
-      *) echo "  $name" | $id ;;
+      SUBWAY) echo "🟦 SUBWAY | $name | $id" ;;
+      LIRR) echo "🟩 LIRR | $name | $id" ;;
+      MNR) echo "🟥 MNR | $name | $id" ;;
+      *) echo "  $name | $id" ;;
     esac
   done
 }
