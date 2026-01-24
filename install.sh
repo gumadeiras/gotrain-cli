@@ -25,3 +25,15 @@ if "${DEST_DIR}/${BIN_NAME}" --help >/dev/null 2>&1; then
 else
     echo "❌ Installation failed. Try adding ${DEST_DIR} to your PATH."
 fi
+
+# PATH check - add to both bashrc and zshrc if they exist
+if [[ ":${PATH}:" != *":${DEST_DIR}:"* ]]; then
+    echo "⚠️  Adding ${DEST_DIR} to PATH..."
+    for rc in "$HOME/.bashrc" "$HOME/.zshrc"; do
+        if [ -f "$rc" ]; then
+            if ! grep -q "${DEST_DIR}" "$rc" 2>/dev/null; then
+                echo "export PATH=\"${DEST_DIR}:\$PATH\"" >> "$rc"
+            fi
+        fi
+    done
+fi
