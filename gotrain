@@ -27,7 +27,7 @@ Examples:
   nyc-train alerts
 
 EOF
-  exit 1
+  exit 0
 }
 
 # API wrapper with caching
