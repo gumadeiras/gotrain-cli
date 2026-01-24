@@ -68,7 +68,7 @@ cmd_stations() {
   echo "====================="
   echo ""
 
-  api_fetch "$endpoint" | jq -r '.[] | "\(.id)|\(.name)|\(.system // "-")"' 2>/dev/null | while IFS='|' read -r id name system; do
+  api_fetch "$endpoint" | jq -r '.[] | [.id, .name, (.system // "-")] | @tsv' 2>/dev/null | while IFS='|' read -r id name system; do
     case "$system" in
       SUBWAY) echo "🟦 SUBWAY | $name | $id" ;;
       LIRR) echo "🟩 LIRR | $name | $id" ;;
