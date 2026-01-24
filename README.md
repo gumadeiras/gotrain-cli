@@ -10,19 +10,10 @@ No dependencies. No config. Just trains.
 
 ## Install
 
-
-##### One-liner (macOS/Linux)
+**One-liner (macOS/Linux):**
 ```bash
 curl -sL https://raw.githubusercontent.com/gumadeiras/gotrain-cli/main/install.sh | bash
 ```
-
-##### Or manually
-```bash
-cp nyc-train ~/.local/bin/gotrain
-chmod +x ~/.local/bin/gotrain
-```
-
-Requires: `curl`, `jq`
 
 ## Usage
 
