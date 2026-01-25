@@ -7,24 +7,39 @@ set -e
 API_BASE="https://metroflow.ainslie.digital/api/v1"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/gotrain"
 CACHE_TTL=60  # seconds
+STATIONS_CACHE="$CACHE_DIR/stations.json"
+STATIONS_CACHE_TTL=$((7 * 24 * 3600)) # 7 days
 
 mkdir -p "$CACHE_DIR"
+
+# Colors and formatting
+BOLD='\033[1m'
+DIM='\033[2m'
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+MAGENTA='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m' # No Color
 
 usage() {
   cat <<EOF
 Usage: gotrain <command> [args]
 
 Commands:
-  stations [query]     List stations (filter by query)
-  departures <id>      Show departures for a station
-  alerts               Show active service alerts
-  favorite <id>        Add/remove station from favorites
-  favs                  List favorite stations
+  stations [query]             List stations (filter by query)
+  departures <id> [--to <id>]  Show departures (from id, optionally to id)
+  arrivals <id> [--from <id>]  Show arrivals (at id, optionally from id)
+  alerts                       Show active service alerts
+  favorite <id|add|rm> [alias] Add/remove station in favorites (optional alias)
+  favs                         List favorite stations
 
 Examples:
-  gotrain stations penn
-  gotrain departures penna
-  gotrain alerts
+  gotrain stations "new haven"
+  gotrain departures MNR-149
+  gotrain favorite add MNR-149 nh
+  gotrain departures nh --to MNR-1
 
 EOF
   exit 0
@@ -49,52 +64,342 @@ api_fetch() {
   curl -s "${API_BASE}${endpoint}" | tee "$cache_file"
 }
 
+update_stations_cache() {
+  local now=$(date +%s)
+  if [[ -f "$STATIONS_CACHE" ]]; then
+    local mtime=$(stat -c %Y "$STATIONS_CACHE" 2>/dev/null || stat -f %m "$STATIONS_CACHE" 2>/dev/null)
+    if [[ $((now - mtime)) -lt $STATIONS_CACHE_TTL ]]; then
+      return
+    fi
+  fi
+  
+  # echo "Updating stations cache..." >&2
+  curl -s "${API_BASE}/stations" > "$STATIONS_CACHE"
+}
+
 # Format time
 format_time() {
   local dt="$1"
-  if [[ -z "$dt" || "$dt" == "null" ]]; then
-    echo "--"
-    return
+  [[ -z "$dt" || "$dt" == "null" ]] && { echo "--"; return; }
+
+  # Clean ISO string: handle milliseconds (.123Z) and plain Z
+  # Convert to format: YYYY-MM-DDTHH:MM:SS+0000
+  local clean_dt=$(echo "$dt" | sed -E 's/\.[0-9]+Z$/+0000/; s/Z$/+0000/')
+
+  local formatted
+  # Try parsing with date (BSD/macOS syntax)
+  if formatted=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_dt" "+%l:%M %p %Z" 2>/dev/null); then
+    # Remove leading space if present (from %l)
+    echo "$formatted" | sed 's/^ //'
+  else
+    # Fallback to original if parsing fails
+    echo "$dt"
   fi
-  date -d "$dt" +"%H:%M" 2>/dev/null || date -jf "%Y-%m-%dT%H:%M" "$dt" +"%H:%M" 2>/dev/null || echo "$dt"
 }
 
 cmd_stations() {
   local query="${1:-}"
-  local endpoint="/stations"
-  [[ -n "$query" ]] && endpoint="/stations?q=$query"
+  update_stations_cache
 
-  echo "NYC Transit Stations"
-  echo "====================="
-  echo ""
+  echo -e "${BOLD}${BLUE}NYC Transit Stations${NC}"
+  echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
-  api_fetch "$endpoint" | jq -r '.[] | [.id, .name, (.system // "-")] | @tsv' 2>/dev/null | while IFS='|' read -r id name system; do
+  local jq_filter='.[]'
+  if [[ -n "$query" ]]; then
+    # Case-insensitive search on name
+    jq_filter=".[] | select(.name | test(\"(?i)$query\"))"
+  fi
+
+  # Extract more fields: id, name, system, borough, accessibilityStatus, lines
+  cat "$STATIONS_CACHE" | jq -r "$jq_filter | \"\(.id)|\(.name)|\(.system // \"-\")|\(.borough // \"-\")|\(.accessibilityStatus // \"-\")|\(.lines | join(\",\"))\"" 2>/dev/null | while IFS='|' read -r id name system borough access lines; do
+    
+    local sys_icon=" "
     case "$system" in
-      SUBWAY) echo "🟦 SUBWAY | $name | $id" ;;
-      LIRR) echo "🟩 LIRR | $name | $id" ;;
-      MNR) echo "🟥 MNR | $name | $id" ;;
-      *) echo "  $name | $id" ;;
+      SUBWAY) sys_icon="🟦" ;;
+      LIRR)   sys_icon="🟩" ;;
+      MNR)    sys_icon="🟥" ;;
     esac
+
+    local access_icon=""
+    if [[ "$access" == "Fully Accessible" ]]; then
+       access_icon=" ♿"
+    elif [[ "$access" == "Partially Accessible" ]]; then
+       access_icon=" ⚠️"
+    fi
+
+    local loc_info=""
+    [[ "$borough" != "-" && "$borough" != "null" ]] && loc_info="${DIM}($borough)${NC}"
+    
+    local lines_info=""
+    [[ -n "$lines" ]] && lines_info=" ${MAGENTA}Lines: $lines${NC}"
+
+    # Format: ICON System | Name (Borough) Lines: ... ♿ ID: ...
+    echo -e "${sys_icon} ${BOLD}${system}${NC} │ ${name} ${loc_info}${lines_info}${access_icon} ${DIM}ID: $id${NC}"
+  done
+}
+
+get_station_name() {
+  local id="$1"
+  cat "$STATIONS_CACHE" | jq -r --arg id "$id" '.[] | select(.id == $id) | .name' 2>/dev/null
+}
+
+resolve_alias() {
+  local input="$1"
+  local fav_file="$CACHE_DIR/favorites"
+  if [[ -f "$fav_file" ]]; then
+    # Check if input matches an alias (field 2)
+    # File format: ID|ALIAS or just ID
+    local resolved
+    resolved=$(awk -F'|' -v q="$input" '$2 == q {print $1; exit}' "$fav_file")
+    if [[ -n "$resolved" ]]; then
+      echo "$resolved"
+      return
+    fi
+  fi
+  echo "$input"
+}
+
+render_board() {
+  local station_id="$1"
+  local mode="$2"  # "departures" or "arrivals"
+  local filter_id="$3" # Optional: ID to filter by (destination for dep, origin for arr)
+  
+  local title="Departures"
+  # Base filter: Departures = Dest is not here. Arrivals = Dest is here.
+  # We use $CURRENT_STATION which is passed to jq later
+  local filter_cond='(.destination != $CURRENT_STATION)'
+
+  if [[ "$mode" == "arrivals" ]]; then
+    title="Arrivals"
+    filter_cond='(.destination == $CURRENT_STATION)'
+  fi
+
+  local dest_filter=""
+  local filter_name_display=""
+
+  # Ensure names are available
+  update_stations_cache
+
+  if [[ -n "$filter_id" ]]; then
+    dest_filter=$(get_station_name "$filter_id")
+    
+    if [[ -z "$dest_filter" ]]; then
+       # Attempt cache refresh if lookup failed
+       rm -f "$STATIONS_CACHE"
+       update_stations_cache
+       dest_filter=$(get_station_name "$filter_id")
+    fi
+    
+    if [[ -z "$dest_filter" ]]; then
+      echo "Error: Could not resolve station name for ID: $filter_id"
+      exit 1
+    fi
+    
+    filter_name_display="$dest_filter ($filter_id)"
+  fi
+
+
+
+  local station_name=$(get_station_name "$station_id")
+  local display_station="$station_id"
+  if [[ -n "$station_name" ]]; then
+    display_station="$station_name ($station_id)"
+  fi
+
+  # Construct jq filter safely
+  # We pass dest_filter_val as an argument to jq to avoid injection/quoting issues
+  
+  local jq_script=".[] | select($filter_cond) | \"\(.routeShortName // \"-\")|\(.destination)|\(.departureTime)|\(.status)|\(.track // \"-\")|\(.peakStatus // \"\")\""
+  
+  # For the logic to work with --arg, we need to change how filter_cond matches.
+  # But filter_cond is built up as a string.
+  # Let's simplify: 
+  # We will construct the select() string using internal variable names like \$DEST
+  
+  local arg_dest=""
+  if [[ -n "$dest_filter" ]]; then
+     arg_dest="$dest_filter"
+     # Update filter_cond to use the env var or arg
+     # We'll use $DEST inside the jq script (passed via --arg DEST ...)
+     
+     if [[ "$mode" == "departures" ]]; then
+       filter_cond="$filter_cond and (.destination | test(\$DEST; \"i\"))"
+     elif [[ "$mode" == "arrivals" ]]; then
+       # Standard Route Name match
+       local route_match="(.routeLongName | test(\$DEST; \"i\")) or (.routeShortName | test(\$DEST; \"i\"))"
+       
+       # Heuristic: If filtering from a Hub (NM-1, LIRR-1), matches are likely Outbound
+       # We check if the filter ID passed matches known hubs.
+       # Using bash to check ID would require passing ID to jq or handling here.
+       # Let's pass FILTER_ID to jq.
+       
+       filter_cond="$filter_cond and ($route_match"
+       
+       # If Filter ID is Grand Central (MNR-1) or Penn (LIRR-1), allow Outbound direction
+       if [[ "$filter_id" == "MNR-1" || "$filter_id" == "LIRR-1" ]]; then
+          filter_cond="$filter_cond or .direction == \"Outbound\""
+       fi
+       
+       filter_cond="$filter_cond)"
+     fi
+  fi
+  
+
+  
+  echo -e "${BOLD}${BLUE}$title${NC} for ${BOLD}$display_station${NC}"
+  if [[ -n "$filter_name_display" ]]; then
+    if [[ "$mode" == "departures" ]]; then
+      echo -e "${DIM}Destination: $filter_name_display${NC}"
+    else
+      echo -e "${DIM}Origin: $filter_name_display${NC}"
+    fi
+  fi
+  echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
+
+  api_fetch "/departures/$station_id" | jq -r --arg DEST "$arg_dest" --arg CURRENT_STATION "$station_name" "map(select($filter_cond)) | sort_by(.departureTime) | .[] | \"\(.routeShortName // \"-\")|\(.destination)|\(.departureTime)|\(.status)|\(.track // \"-\")|\(.peakStatus // \"\")|\(.routeLongName // \"\")|\(.direction // \"\")|\(.tripId // \"\")\"" 2>/dev/null | while IFS='|' read -r route dest time status track peak route_long dir trip_id; do
+    local time_fmt=$(format_time "$time")
+    
+    local status_color="$GREEN"
+    if [[ "$status" == *"Delayed"* ]]; then 
+      status_color="$YELLOW"
+    elif [[ "$status" == *"Cancel"* ]]; then
+      status_color="$RED"
+    elif [[ "$status" == *"Due"* ]]; then
+      status_color="$GREEN"
+    fi
+
+    # Fix known data issues (e.g. MNR-149 New Haven -> New Haven-State St)
+    if [[ "$station_id" == "MNR-149" && "$dest" == "New Haven" ]]; then
+      dest="New Haven-State St"
+    fi
+
+    local info_str=""
+    [[ -n "$peak" && "$peak" != "null" ]] && info_str="  ${DIM}($peak)${NC}"
+
+    local dir_label="To"
+    [[ "$mode" == "arrivals" ]] && dir_label="From" 
+    [[ "$mode" == "arrivals" ]] && dir_label="Terminates"
+
+    # Row 1: Time | Destination | Route Info
+    # e.g. 01:59 PM EST │ New Haven (Off-Peak) [Line: New Haven]
+    
+    local line_info=""
+    [[ -n "$route_long" && "$route_long" != "null" ]] && line_info=" ${MAGENTA}[Line: $route_long]${NC}"
+
+    local dest_display="$dest"
+    
+    if [[ "$mode" == "arrivals" ]]; then
+       local origin_guess=""
+       
+       # Heuristic: Outbound trains on MNR/LIRR come from the Hubs
+       if [[ "$dir" == "Outbound" ]]; then
+          if [[ "$station_id" == MNR* ]]; then origin_guess="Grand Central"; fi
+          if [[ "$station_id" == LIRR* ]]; then origin_guess="New York"; fi
+       fi
+       
+       # Safety: Don't guess Origin == Current Station
+       # "Grand Central" matching "Grand Central"
+       # Normalized check? 
+       if [[ "$origin_guess" == "$station_name" ]]; then origin_guess=""; fi
+       
+       # Clarify Destination vs Origin
+       if [[ "$dest" == "$station_name" ]]; then
+          # Terminating Here.
+          if [[ -n "$origin_guess" ]]; then
+             dest_display="From $origin_guess"
+          else
+             dest_display="$dest"
+          fi
+       else
+          # Continuing
+          if [[ -n "$origin_guess" ]]; then
+             dest_display="$origin_guess ➤ $dest"
+          else
+             dest_display="Continues to $dest"
+          fi
+       fi
+    fi
+
+    printf "${CYAN}%-12s${NC} ${DIM}│${NC} ${BOLD}%s${NC}${info_str}${line_info}\n" "$time_fmt" "$dest_display"
+    
+    # Row 2: Status | Track | Trip ID
+    local track_display="Track ${BOLD}$track${NC}"
+    [[ "$track" == "-" || "$track" == "null" ]] && track_display="${DIM}No Track${NC}"
+    
+    # Time col (12) + Space (1) = 13 spaces indentation
+    printf "             ${DIM}│${NC} ${status_color}%-14s${NC} %b ${DIM}(Train #%s)${NC}\n" "$status" "$track_display" "$trip_id"
+    echo ""
   done
 }
 
 cmd_departures() {
-  local station_id="${1:-}"
-  [[ -z "$station_id" ]] && { echo "Usage: gotrain departures <station-id>"; exit 1; }
-
-  echo "Departures for $station_id"
-  echo "==========================="
-  echo ""
-
-  api_fetch "/departures/$station_id" | jq -r '.[] | "\(.routeShortName // "-")|\(.destination)|\(.departureTime)|\(.status)|\(.track // "-")"' 2>/dev/null | while IFS='|' read -r route dest time status track; do
-    local time_fmt=$(format_time "$time")
-    local icon="🟢"
-    [[ "$status" == *"Delayed"* ]] && icon="🟡"
-    [[ "$status" == *"Due"* ]] && icon="🟢"
-
-    echo "$time_fmt | $route → $dest $icon"
-    echo "      Track: $track | $status"
+  local station_id=""
+  local filter_to_id=""
+  
+  # Parse args
+  local positional_args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --from) station_id="$2"; shift 2 ;;
+      --to) filter_to_id="$2"; shift 2 ;;
+      *) positional_args+=("$1"); shift ;;
+    esac
   done
+
+  if [[ -z "$station_id" ]]; then
+    station_id="${positional_args[0]}"
+  fi
+
+  [[ -z "$station_id" ]] && { echo "Usage: gotrain departures <station-id|alias> [--to <dest-id|alias>]"; exit 1; }
+
+  # Resolve aliases
+  station_id=$(resolve_alias "$station_id")
+  if [[ -n "$filter_to_id" ]]; then
+    filter_to_id=$(resolve_alias "$filter_to_id")
+  fi
+
+  local filter_name=""
+  if [[ -n "$filter_to_id" ]]; then
+    filter_name=$(get_station_name "$filter_to_id")
+    [[ -z "$filter_name" ]] && { echo "Error: Unknown destination station ID: $filter_to_id"; exit 1; }
+  fi
+
+  render_board "$station_id" "departures" "$filter_to_id"
+}
+
+cmd_arrivals() {
+  local station_id=""
+  local filter_from_id=""
+
+  # Parse args
+  local positional_args=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --to) station_id="$2"; shift 2 ;;
+      --from) filter_from_id="$2"; shift 2 ;;
+      *) positional_args+=("$1"); shift ;;
+    esac
+  done
+
+  if [[ -z "$station_id" ]]; then
+    station_id="${positional_args[0]}"
+  fi
+
+  [[ -z "$station_id" ]] && { echo "Usage: gotrain arrivals <station-id|alias> [--from <origin-id|alias>]"; exit 1; }
+
+  # Resolve aliases
+  station_id=$(resolve_alias "$station_id")
+  if [[ -n "$filter_from_id" ]]; then
+    filter_from_id=$(resolve_alias "$filter_from_id")
+  fi
+
+  local filter_name=""
+  if [[ -n "$filter_from_id" ]]; then
+    filter_name=$(get_station_name "$filter_from_id")
+    [[ -z "$filter_name" ]] && { echo "Error: Unknown origin station ID: $filter_from_id"; exit 1; }
+  fi
+
+  render_board "$station_id" "arrivals" "$filter_from_id"
 }
 
 cmd_alerts() {
@@ -110,35 +415,102 @@ cmd_alerts() {
 }
 
 cmd_favorite() {
-  local id="${1:-}"
-  [[ -z "$id" ]] && { echo "Usage: gotrain favorite <station-id>"; exit 1; }
-
+  local subcmd="${1:-}"
+  local id="${2:-}"
+  local alias="${3:-}"
   local fav_file="$CACHE_DIR/favorites"
-  if grep -q "^$id$" "$fav_file" 2>/dev/null; then
-    grep -v "^$id$" "$fav_file" > "$fav_file.tmp" && mv "$fav_file.tmp" "$fav_file"
-    echo "Removed $id from favorites"
+  [[ ! -f "$fav_file" ]] && touch "$fav_file"
+
+  # Helper to remove an ID from file (handles ID and ID|ALIAS)
+  remove_station_from_favs() {
+    local station_id="$1"
+    local tmp_file="$fav_file.tmp"
+    # Filter out lines where the first field (ID) matches matches the target
+    awk -F'|' -v tid="$station_id" '$1 != tid' "$fav_file" > "$tmp_file" && mv "$tmp_file" "$fav_file"
+  }
+
+  # Helper to check if ID exists
+  station_exists_in_favs() {
+    local station_id="$1"
+    # Matches START-OF-LINE + ID + (End-of-line OR Pipe)
+    grep -E "^$station_id(\||$)" "$fav_file" >/dev/null 2>&1
+  }
+
+  # Handle subcommands
+  if [[ "$subcmd" == "add" ]]; then
+     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favorite add <station-id> [alias]${NC}"; exit 1; }
+     
+     if station_exists_in_favs "$id"; then
+       # Remove old entry first to ensure no duplicates/updates alias
+       remove_station_from_favs "$id"
+       echo "$id|$alias" >> "$fav_file"
+       echo -e "${GREEN}Updated favorite ${BOLD}$id${NC}${GREEN} with alias '${BOLD}$alias${NC}' ${NC}✅"
+     else
+       echo "$id|$alias" >> "$fav_file"
+       echo -e "${GREEN}Added ${BOLD}$id${NC}${GREEN} to favorites (Alias: $alias) ${NC}✅"
+     fi
+     return
+  elif [[ "$subcmd" == "remove" || "$subcmd" == "rm" ]]; then
+     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favorite remove <station-id|alias>${NC}"; exit 1; }
+     
+     # Resolve alias if user passed alias to remove
+     local resolved=$(resolve_alias "$id")
+     local remove_id="$resolved"
+     
+     if station_exists_in_favs "$remove_id"; then
+       remove_station_from_favs "$remove_id"
+       echo -e "${RED}Removed ${BOLD}$remove_id${NC}${RED} from favorites ${NC}🗑️"
+     else
+       echo -e "${YELLOW}Station ${BOLD}$id${NC}${YELLOW} is not in favorites.${NC}"
+     fi
+     return
+  fi
+
+  # Default Toggle Behavior
+  id="$subcmd"
+  [[ -z "$id" ]] && { 
+    echo -e "${RED}Usage: gotrain favorite <id|add|remove> [alias]${NC}"
+    echo ""
+    echo "Examples:"
+    echo "  gotrain favorite add MNR-149 home   # Add with alias"
+    echo "  gotrain favorite rm home            # Remove by alias"
+    echo "  gotrain favorite MNR-124            # Toggle (add/remove)"
+    echo "  gotrain favs                        # List all favorites"
+    exit 1
+  }
+  
+  local resolved=$(resolve_alias "$id")
+  if station_exists_in_favs "$resolved"; then
+    remove_station_from_favs "$resolved"
+    echo -e "${RED}Removed ${BOLD}$resolved${NC}${RED} from favorites ${NC}🗑️"
   else
-    echo "$id" >> "$fav_file"
-    echo "Added $id to favorites"
+    echo "$resolved|" >> "$fav_file"
+    echo -e "${GREEN}Added ${BOLD}$resolved${NC}${GREEN} to favorites ${NC}✅"
   fi
 }
 
 cmd_favs() {
-  echo "Favorite Stations"
-  echo "=================="
-  echo ""
+  echo -e "${BOLD}${BLUE}Favorite Stations${NC}"
+  echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
   local fav_file="$CACHE_DIR/favorites"
   [[ ! -f "$fav_file" ]] && { echo "No favorites yet. Use 'gotrain favorite <id>' to add."; exit 0; }
 
-  while read -r id; do
+  update_stations_cache
+
+  while IFS='|' read -r id alias; do
     [[ -z "$id" ]] && continue
-    api_fetch "/stations?q=$id" | jq -r --arg id "$id" '.[] | select(.id == $id) | "\(.id)|\(.name)|\(.system)"' 2>/dev/null | while IFS='|' read -r sid name system; do
+    # Look up from local cache instead of API
+    cat "$STATIONS_CACHE" | jq -r --arg id "$id" '.[] | select(.id == $id) | "\(.id)|\(.name)|\(.system)"' 2>/dev/null | while IFS='|' read -r sid name system; do
+      
+      local alias_display=""
+      [[ -n "$alias" ]] && alias_display=" ${MAGENTA}(Alias: $alias)${NC}"
+      
       case "$system" in
-        SUBWAY) echo "🟦 SUBWAY | $name ($sid)" ;;
-        LIRR) echo "🟩 LIRR | $name ($sid)" ;;
-        MNR) echo "🟥 MNR | $name ($sid)" ;;
-        *) echo "  $name ($sid)" ;;
+        SUBWAY) echo -e "🟦 ${BOLD}SUBWAY${NC} | $name ${DIM}($sid)${NC}${alias_display}" ;;
+        LIRR) echo -e "🟩 ${BOLD}LIRR${NC}   | $name ${DIM}($sid)${NC}${alias_display}" ;;
+        MNR) echo -e "🟥 ${BOLD}MNR${NC}    | $name ${DIM}($sid)${NC}${alias_display}" ;;
+        *) echo -e "  $name ${DIM}($sid)${NC}${alias_display}" ;;
       esac
     done
   done < "$fav_file"
@@ -149,10 +521,11 @@ cmd_favs() {
 
 case "$1" in
   stations|s) cmd_stations "${2:-}" ;;
-  departures|d) cmd_departures "$2" ;;
+  departures|d) shift; cmd_departures "$@" ;;
+  arrivals|ar) shift; cmd_arrivals "$@" ;;
   alerts|a) cmd_alerts ;;
-  favorite|fav) cmd_favorite "$2" ;;
-  favs|favorites) cmd_favs ;;
+  favorite|fav|favorites) shift; cmd_favorite "$@" ;;
+  favs) cmd_favs ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1"; usage ;;
 esac
