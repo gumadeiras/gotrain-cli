@@ -79,6 +79,13 @@ Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time MTA 
 
 Most train apps are bloated. This is one shell script. No Node.js, no Python, no dependencies to break.
 
-## License
+## Contributing
+ 
+ PRs are welcome! If you find any bugs or have feature requests, please [open an issue](https://github.com/gumadeiras/gotrain-cli/issues/new).
+
+ - **Development**: Run `./tests/test_gotrain.py` to verify changes locally.
+ - **Style**: Keep the script atomic. No external dependencies if possible.
+
+ ## License
 
 MIT 🐧
