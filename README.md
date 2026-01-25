@@ -42,25 +42,26 @@ gotrain favs                     # List favorite stations
 ```
 
 ### Examples
-
-```bash
-$ gotrain stations haven
-🟥 MNR | New Haven
-🟥 MNR | New Haven-State St
-🟥 MNR | West Haven
-
-$ gotrain departures MNR-149
-🟥 New Haven Departures
-========================
-15:39 | → Grand Central 🟢
-      Track: 19 | On Time
-16:24 | → Grand Central 🟢
-      Track: - | On Time
-
-$ gotrain alerts
-⚠️  Uptown [4][5] trains are running with delays...
-   No description....
-```
+ 
+ ```bash
+ $ gotrain stations "new haven"
+ 🟥 MNR │ New Haven (CT) Lines: New Haven ♿ ID: MNR-149
+ 🟥 MNR │ New Haven-State St (CT) Lines: New Haven ♿ ID: MNR-150
+ 🟥 MNR │ West Haven (CT) Lines: New Haven ♿ ID: MNR-148
+ 
+ $ gotrain departures MNR-149
+ � Departures for New Haven (MNR-149)
+ ──────────────────────────────────────────────────────────
+ 10:39 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
+              │ On Time        Track 1 (Train #1539)
+ 
+ 11:24 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
+              │ On Time        Track 2 (Train #1545)
+ 
+ $ gotrain alerts
+ ⚠️  Uptown [4][5] trains are running with delays...
+    No description....
+ ```
 
 ## Commands
 
