@@ -1,0 +1,32 @@
+[
+    {
+        "id": "alert-1",
+        "title": "Hudson Line Delays",
+        "description": "Delays of up to 15 minutes due to slip-slide conditions.",
+        "affectedLines": [
+            "Hudson"
+        ],
+        "activePeriods": [
+            {
+                "start": "2023-10-27T10:00:00Z",
+                "end": null
+            }
+        ],
+        "affectedStationsLabels": []
+    },
+    {
+        "id": "alert-2",
+        "title": "Elevator Outage",
+        "description": "Elevator at Grand Central is out of service.",
+        "affectedLines": [],
+        "activePeriods": [
+            {
+                "start": "2023-10-20T08:00:00Z",
+                "end": "2023-12-01T08:00:00Z"
+            }
+        ],
+        "affectedStationsLabels": [
+            "Grand Central"
+        ]
+    }
+]

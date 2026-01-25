@@ -413,13 +413,50 @@ cmd_arrivals() {
 }
 
 cmd_alerts() {
-  echo "Active Service Alerts"
-  echo "======================"
-  echo ""
+  echo -e "${BOLD}${YELLOW}Service Alerts${NC}"
+  echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
-  api_fetch "/alerts?activeNow=true&includeLabels=true" | jq -r '.[] | "\(.title)|\(.description[0:100])"' 2>/dev/null | while IFS='|' read -r title desc; do
-    echo "⚠️  $title"
-    echo "   $desc..."
+  # Get alerts
+  # We extract: start, end, affectedLines(joined), affectedStations(joined), title, description
+  api_fetch "/alerts?activeNow=true&includeLabels=true" | jq -r '
+    .[] | 
+    [
+      (.activePeriods[0].start // ""), 
+      (.activePeriods[0].end // ""), 
+      (.affectedLines | join(", ")), 
+      (.affectedStationsLabels | join(", ")), 
+      .title, 
+      ((.description // "") | gsub("\n"; "  ") | gsub("\\|"; "-"))
+    ] | join("|")
+  ' 2>/dev/null | while IFS='|' read -r start end lines stations title desc; do
+    
+    local time_info=""
+    if [[ -n "$start" ]]; then
+      local start_fmt=$(format_time "$start")
+      time_info="🕒 ${DIM}Start:${NC} $start_fmt"
+    fi
+    if [[ -n "$end" ]]; then
+       local end_fmt=$(format_time "$end")
+       time_info="$time_info  ${DIM}End:${NC} $end_fmt"
+    fi
+
+    local scope_info=""
+    if [[ -n "$lines" ]]; then
+       scope_info="${MAGENTA}Lines: $lines${NC}"
+    elif [[ -n "$stations" ]]; then
+       scope_info="${MAGENTA}Stations: $stations${NC}"
+    else
+       scope_info="${DIM}General${NC}"
+    fi
+
+    echo -e "${YELLOW}⚠️  ${BOLD}$title${NC}"
+    echo -e "   $time_info • $scope_info"
+    
+    if [[ -n "$desc" ]]; then
+       echo -e "   ${DIM}────────────────────────────────────────────────${NC}"
+       # Wrap description slightly for readability (simple fmt replacement)
+       echo -e "   $desc" | sed 's/^/   /'
+    fi
     echo ""
   done
 }
