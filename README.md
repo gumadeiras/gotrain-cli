@@ -26,16 +26,19 @@ curl -sL https://raw.githubusercontent.com/gumadeiras/gotrain-cli/main/install.s
 gotrain stations penn       # Search for "penn"
 gotrain stations            # List all stations
 
-# Get departures
-gotrain departures MNR-149  # New Haven departures
-gotrain departures MNR-1    # Grand Central departures
+# Departures & Arrivals
+gotrain departures MNR-149  # Departures from New Haven
+gotrain departures nh --to MNR-1 # Filter departures to Grand Central (using alias)
+gotrain arrivals MNR-1      # Arrivals at Grand Central
+gotrain arrivals MNR-1 --from nh # Filter arrivals from New Haven
 
 # Service alerts
 gotrain alerts              # Active service alerts
 
 # Favorites
-gotrain fav MNR-149         # Add/remove station from favorites
-gotrain favs                # List favorite stations
+gotrain favorite add MNR-149 nh  # Add with alias 'nh'
+gotrain favorite rm nh           # Remove by alias
+gotrain favs                     # List favorite stations
 ```
 
 ### Examples
@@ -64,9 +67,10 @@ $ gotrain alerts
 | Command | Description |
 |---------|-------------|
 | `stations [query]` | Search/list stations |
-| `departures <id>` | Show departures for station |
+| `departures <id> [--to <id>]` | Show departures (optional destination filter) |
+| `arrivals <id> [--from <id>]` | Show arrivals (optional origin filter) |
 | `alerts` | Active service alerts |
-| `fav <id>` | Toggle favorite station |
+| `favorite <id\|add\|rm> [alias]` | Add/remove/toggle favorites |
 | `favs` | List favorite stations |
 
 ## Clawdbot Integration
