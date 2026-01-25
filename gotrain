@@ -415,10 +415,13 @@ cmd_arrivals() {
 
 cmd_alerts() {
   local station_filter=""
-  
+  local limit=5
+  local show_all=false
+
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --station|-s) station_filter="$2"; shift 2 ;;
+      --all) show_all=true; shift ;;
       *) shift ;;
     esac
   done
@@ -440,17 +443,14 @@ cmd_alerts() {
   echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
   # Get alerts
-  # Logic:
-  # 1. Select: If filter_id set, check affectedStations contains ID OR affectedStationsLabels contains Name
-  # 2. Unique by title
-  # 3. Sort by start (desc)
-  # 4. Count total
-  # 5. Output TOTAL line then the top 10
-  
   local alerts_json=$(api_fetch "/alerts?activeNow=true&includeLabels=true")
   
+  # Determine limit
+  local jq_limit=$limit
+  [[ "$show_all" == "true" ]] && jq_limit=9999
+
   # We use jq to process mostly everything
-  echo "$alerts_json" | jq -r --arg FILTER_ID "$filter_id" --arg FILTER_NAME "$filter_name" '
+  echo "$alerts_json" | jq -r --arg FILTER_ID "$filter_id" --arg FILTER_NAME "$filter_name" --argjson LIMIT "$jq_limit" '
     [ .[] | select(
       if $FILTER_ID != "" then
         (
@@ -463,7 +463,7 @@ cmd_alerts() {
     | sort_by(.activePeriods[0].start) | reverse 
     | . as $sorted 
     | "METADATA|\($sorted | length)", 
-      ($sorted[0:10] | .[] | 
+      ($sorted[0:$LIMIT] | .[] | 
         [
           (.activePeriods[0].start // ""), 
           (.activePeriods[0].end // ""), 
@@ -478,9 +478,19 @@ cmd_alerts() {
     # Check for metadata line
     if [[ "$p1" == "METADATA" ]]; then
        local total="$p2"
-       echo -e "${DIM}Showing top 10 of ${BOLD}$total${NC}${DIM} distinct active alerts.${NC}"
-       echo ""
-       if [[ "$total" -eq 0 ]]; then
+       local display_limit=$limit
+       [[ "$show_all" == "true" ]] && display_limit=$total
+       
+       local count=$(( total < display_limit ? total : display_limit ))
+       
+       if [[ "$total" -gt 0 ]]; then
+         if [[ "$show_all" == "true" ]]; then
+             echo -e "${DIM}Showing all ${BOLD}$total${NC}${DIM} distinct active alerts.${NC}"
+         else
+             echo -e "${DIM}Showing top ${BOLD}$count${NC}${DIM} of ${BOLD}$total${NC}${DIM} distinct active alerts.${NC}"
+         fi
+         echo ""
+       else
          echo "No active alerts found."
          return
        fi

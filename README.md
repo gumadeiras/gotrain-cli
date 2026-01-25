@@ -77,7 +77,7 @@ gotrain favs                     # List favorite stations
 | `stations [query]` | Search/list stations |
 | `departures <id> [--to <id>]` | Show departures (optional destination filter) |
 | `arrivals <id> [--from <id>]` | Show arrivals (optional origin filter) |
-| `alerts [--station <id>]` | Active service alerts (optional station filter) |
+| `alerts [--station <id>] [--all]` | Active service alerts (optional station filter, all alerts) |
 | `favorite <id\|add\|rm> [alias]` | Add/remove/toggle favorites |
 | `favs` | List favorite stations |
 
