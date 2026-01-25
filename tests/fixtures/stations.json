@@ -1,0 +1,26 @@
+[
+  {
+    "id": "MNR-1",
+    "name": "Grand Central",
+    "system": "MNR",
+    "borough": "Manhattan",
+    "accessibilityStatus": "Fully Accessible",
+    "lines": ["Hudson", "Harlem", "New Haven"]
+  },
+  {
+    "id": "LIRR-1",
+    "name": "Penn Station",
+    "system": "LIRR",
+    "borough": "Manhattan",
+    "accessibilityStatus": "Partially Accessible",
+    "lines": ["Babylon", "Ronkonkoma"]
+  },
+  {
+    "id": "SUB-123",
+    "name": "Times Sq-42 St",
+    "system": "SUBWAY",
+    "borough": "Manhattan",
+    "accessibilityStatus": "Fully Accessible",
+    "lines": ["1", "2", "3", "7", "N", "Q", "R", "W", "S"]
+  }
+]

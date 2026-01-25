@@ -12,6 +12,16 @@ STATIONS_CACHE_TTL=$((7 * 24 * 3600)) # 7 days
 
 mkdir -p "$CACHE_DIR"
 
+check_deps() {
+  for cmd in curl jq date awk sed; do
+    if ! command -v $cmd &> /dev/null; then
+      echo "Error: Required command '$cmd' not found."
+      exit 1
+    fi
+  done
+}
+check_deps
+
 # Colors and formatting
 BOLD='\033[1m'
 DIM='\033[2m'
@@ -494,7 +504,7 @@ cmd_favs() {
   echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
   local fav_file="$CACHE_DIR/favorites"
-  [[ ! -f "$fav_file" ]] && { echo "No favorites yet. Use 'gotrain favorite <id>' to add."; exit 0; }
+  [[ ! -s "$fav_file" ]] && { echo "No favorites yet. Use 'gotrain favorite <id>' to add."; exit 0; }
 
   update_stations_cache
 

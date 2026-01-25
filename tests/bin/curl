@@ -1,0 +1,15 @@
+#!/bin/bash
+# Mock curl
+
+for arg in "$@"; do
+  if [[ "$arg" == *"/stations" ]]; then
+     cat "$(dirname "$0")/../fixtures/stations.json"
+     exit 0
+  fi
+  if [[ "$arg" == *"/departures/"* ]]; then
+     cat "$(dirname "$0")/../fixtures/departures.json"
+     exit 0
+  fi
+done
+
+echo "[]"
