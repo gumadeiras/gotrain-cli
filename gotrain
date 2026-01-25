@@ -90,6 +90,7 @@ update_stations_cache() {
 # Format time
 format_time() {
   local dt="$1"
+  local fmt="${2:-+%l:%M %p %Z}"
   [[ -z "$dt" || "$dt" == "null" ]] && { echo "--"; return; }
 
   # Clean ISO string: handle milliseconds (.123Z) and plain Z
@@ -98,7 +99,7 @@ format_time() {
 
   local formatted
   # Try parsing with date (BSD/macOS syntax)
-  if formatted=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_dt" "+%l:%M %p %Z" 2>/dev/null); then
+  if formatted=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_dt" "$fmt" 2>/dev/null); then
     # Remove leading space if present (from %l)
     echo "$formatted" | sed 's/^ //'
   else
@@ -413,30 +414,93 @@ cmd_arrivals() {
 }
 
 cmd_alerts() {
+  local station_filter=""
+  
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --station|-s) station_filter="$2"; shift 2 ;;
+      *) shift ;;
+    esac
+  done
+
+  # Resolve station filter if provided
+  local filter_id=""
+  local filter_name=""
+  if [[ -n "$station_filter" ]]; then
+      filter_id=$(resolve_alias "$station_filter")
+      update_stations_cache
+      filter_name=$(get_station_name "$filter_id")
+      [[ -z "$filter_name" ]] && filter_name="$station_filter" # Fallback
+  fi
+
   echo -e "${BOLD}${YELLOW}Service Alerts${NC}"
+  if [[ -n "$filter_name" ]]; then
+      echo -e "Filtering for: ${BOLD}$filter_name${NC}"
+  fi
   echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
 
   # Get alerts
-  # We extract: start, end, affectedLines(joined), affectedStations(joined), title, description
-  api_fetch "/alerts?activeNow=true&includeLabels=true" | jq -r '
-    .[] | 
-    [
-      (.activePeriods[0].start // ""), 
-      (.activePeriods[0].end // ""), 
-      (.affectedLines | join(", ")), 
-      (.affectedStationsLabels | join(", ")), 
-      .title, 
-      ((.description // "") | gsub("\n"; "  ") | gsub("\\|"; "-"))
-    ] | join("|")
-  ' 2>/dev/null | while IFS='|' read -r start end lines stations title desc; do
+  # Logic:
+  # 1. Select: If filter_id set, check affectedStations contains ID OR affectedStationsLabels contains Name
+  # 2. Unique by title
+  # 3. Sort by start (desc)
+  # 4. Count total
+  # 5. Output TOTAL line then the top 10
+  
+  local alerts_json=$(api_fetch "/alerts?activeNow=true&includeLabels=true")
+  
+  # We use jq to process mostly everything
+  echo "$alerts_json" | jq -r --arg FILTER_ID "$filter_id" --arg FILTER_NAME "$filter_name" '
+    [ .[] | select(
+      if $FILTER_ID != "" then
+        (
+             any(.affectedStations[]?; . == $FILTER_ID)
+          or any(.affectedStationsLabels[]?; test($FILTER_NAME; "i"))
+        )
+      else true end
+    ) ] 
+    | unique_by(.title) 
+    | sort_by(.activePeriods[0].start) | reverse 
+    | . as $sorted 
+    | "METADATA|\($sorted | length)", 
+      ($sorted[0:10] | .[] | 
+        [
+          (.activePeriods[0].start // ""), 
+          (.activePeriods[0].end // ""), 
+          (.affectedLines | join(", ")), 
+          (.affectedStationsLabels | join(", ")), 
+          .title, 
+          ((.description // "") | gsub("\n"; "  ") | gsub("\\|"; "-"))
+        ] | join("|")
+      )
+  ' | while IFS='|' read -r p1 p2 p3 p4 p5 p6; do
     
+    # Check for metadata line
+    if [[ "$p1" == "METADATA" ]]; then
+       local total="$p2"
+       echo -e "${DIM}Showing top 10 of ${BOLD}$total${NC}${DIM} distinct active alerts.${NC}"
+       echo ""
+       if [[ "$total" -eq 0 ]]; then
+         echo "No active alerts found."
+         return
+       fi
+       continue
+    fi
+
+    local start="$p1"
+    local end="$p2"
+    local lines="$p3"
+    local stations="$p4"
+    local title="$p5"
+    local desc="$p6"
+
     local time_info=""
     if [[ -n "$start" ]]; then
-      local start_fmt=$(format_time "$start")
+      local start_fmt=$(format_time "$start" "+%b %d %l:%M %p")
       time_info="🕒 ${DIM}Start:${NC} $start_fmt"
     fi
     if [[ -n "$end" ]]; then
-       local end_fmt=$(format_time "$end")
+       local end_fmt=$(format_time "$end" "+%b %d %l:%M %p")
        time_info="$time_info  ${DIM}End:${NC} $end_fmt"
     fi
 
@@ -444,6 +508,10 @@ cmd_alerts() {
     if [[ -n "$lines" ]]; then
        scope_info="${MAGENTA}Lines: $lines${NC}"
     elif [[ -n "$stations" ]]; then
+       # Truncate stations if too long
+       if [[ ${#stations} -gt 50 ]]; then
+          stations="${stations:0:47}..."
+       fi
        scope_info="${MAGENTA}Stations: $stations${NC}"
     else
        scope_info="${DIM}General${NC}"
@@ -454,7 +522,6 @@ cmd_alerts() {
     
     if [[ -n "$desc" ]]; then
        echo -e "   ${DIM}────────────────────────────────────────────────${NC}"
-       # Wrap description slightly for readability (simple fmt replacement)
        echo -e "   $desc" | sed 's/^/   /'
     fi
     echo ""
@@ -570,7 +637,7 @@ case "$1" in
   stations|s) cmd_stations "${2:-}" ;;
   departures|d) shift; cmd_departures "$@" ;;
   arrivals|ar) shift; cmd_arrivals "$@" ;;
-  alerts|a) cmd_alerts ;;
+  alerts|a) shift; cmd_alerts "$@" ;;
   favorite|fav|favorites) shift; cmd_favorite "$@" ;;
   favs) cmd_favs ;;
   -h|--help|help) usage ;;

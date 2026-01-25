@@ -77,13 +77,20 @@ class TestGoTrain(unittest.TestCase):
         self.assertIn("Delayed", output) 
     
     def test_alerts(self):
-        """Test alerts listing"""
+        """Test alerts listing and filtering"""
         result = self.run_gotrain(["alerts"])
         self.assertEqual(result.returncode, 0)
         output = self.strip_ansi(result.stdout)
         self.assertIn("Hudson Line Delays", output)
-        self.assertIn("Lines: Hudson", output)
-        self.assertIn("slip-slide", output)
+        self.assertIn("Showing top 10 of 2", output)
+        
+        # Test filtering
+        result = self.run_gotrain(["alerts", "--station", "Grand Central"])
+        self.assertEqual(result.returncode, 0)
+        output = self.strip_ansi(result.stdout)
+        self.assertIn("Filtering for: Grand Central", output)
+        self.assertIn("Elevator Outage", output)
+        self.assertNotIn("Hudson Line Delays", output)
 
     def test_favorites(self):
         """Test adding and removing favorites"""
