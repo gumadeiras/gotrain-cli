@@ -8,6 +8,10 @@ No dependencies. No config. Just trains.
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+## Why?
+
+Most train apps are bloated. This is one shell script.
+
 ## Install
 
 **One-liner (macOS/Linux):**
@@ -74,10 +78,6 @@ This tool is available as a **ClawdHub skill**! Use it from any chat where Clawd
 ## Data Source
 
 Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time MTA transit data.
-
-## Why?
-
-Most train apps are bloated. This is one shell script. No Node.js, no Python, no dependencies to break.
 
 ## Contributing
  
