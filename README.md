@@ -47,16 +47,23 @@ gotrain favs                     # List favorite stations
  $ gotrain stations "new haven"
  🟥 MNR │ New Haven (CT) Lines: New Haven ♿ ID: MNR-149
  🟥 MNR │ New Haven-State St (CT) Lines: New Haven ♿ ID: MNR-150
- 🟥 MNR │ West Haven (CT) Lines: New Haven ♿ ID: MNR-148
  
  $ gotrain departures MNR-149
- � Departures for New Haven (MNR-149)
+ Departures for New Haven (MNR-149)
  ──────────────────────────────────────────────────────────
  10:39 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
               │ On Time        Track 1 (Train #1539)
  
  11:24 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
               │ On Time        Track 2 (Train #1545)
+ 
+ $ gotrain favorite add MNR-149 home
+ Added MNR-149 to favorites (Alias: home) ✅
+ 
+ $ gotrain departures home
+ 🟦 Departures for New Haven (MNR-149)
+ ──────────────────────────────────────────────────────────
+ ...
  
  $ gotrain alerts
  ⚠️  Uptown [4][5] trains are running with delays...
