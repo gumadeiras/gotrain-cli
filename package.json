@@ -23,7 +23,20 @@
     "type": "git",
     "url": "git+https://github.com/gumadeiras/gotrain-cli.git"
   },
-  "keywords": [],
+  "keywords": [
+    "mta",
+    "nyc",
+    "subway",
+    "lirr",
+    "mnr",
+    "metro-north",
+    "train",
+    "departures",
+    "arrivals",
+    "transit",
+    "cli",
+    "real-time"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
