@@ -69,33 +69,28 @@ program
     });
 
 program
-    .command('favorite')
+    .command('favs')
     .alias('fav')
-    .description('Add/remove station in favorites')
-    .argument('<subcmd|id>', 'subcommand (add, remove) or station ID')
-    .argument('[alias|id]', 'alias for add/remove, or station ID if first arg was subcmd')
-    .argument('[alias]', 'alias if first two args were add/remove AND id')
+    .description('Manage favorite stations (list, add, remove)')
+    .argument('[subcmd|id]', 'subcommand (add, remove, rm) or station ID')
+    .argument('[id|alias]', 'station ID for add/remove, or alias if toggle')
+    .argument('[alias]', 'alias if add/remove and ID provided')
     .action(async (arg1, arg2, arg3) => {
         try {
-            // Logic to handle flexible arguments
-            if (['add', 'remove', 'rm'].includes(arg1)) {
-                await cmdFavorite(arg1, arg2, arg3);
+            if (!arg1) {
+                await cmdFavs();
+            } else if (['add', 'remove', 'rm', 'list'].includes(arg1)) {
+                if (arg1 === 'list') {
+                    await cmdFavs();
+                } else {
+                    await cmdFavorite(arg1, arg2, arg3);
+                }
             } else {
-                await cmdFavorite(arg1, arg2); // Toggle behavior
+                // Default toggle/fallback behavior
+                await cmdFavorite(arg1, arg2);
             }
         } catch (err) {
-            console.error('Error updating favorites:', err instanceof Error ? err.message : err);
-        }
-    });
-
-program
-    .command('favs')
-    .description('List favorite stations')
-    .action(async () => {
-        try {
-            await cmdFavs();
-        } catch (err) {
-            console.error('Error fetching favorites:', err instanceof Error ? err.message : err);
+            console.error('Error managing favorites:', err instanceof Error ? err.message : err);
         }
     });
 

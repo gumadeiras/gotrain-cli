@@ -1,11 +1,11 @@
 
-import { getFavorites, addFavorite, removeFavorite, getStations } from '../api';
+import { getFavorites, addFavorite, removeFavorite, getStations, resolveAlias } from '../api';
 import { colors, getSystemIcon } from '../utils';
 
 export async function cmdFavorite(subcmd: string, id?: string, alias?: string) {
     if (subcmd === 'add') {
         if (!id) {
-            console.error(colors.red('Usage: gotrain favorite add <station-id> [alias]'));
+            console.error(colors.red('Usage: gotrain favs add <station-id> [alias]'));
             process.exit(1);
         }
         addFavorite(id, alias);
@@ -15,22 +15,24 @@ export async function cmdFavorite(subcmd: string, id?: string, alias?: string) {
 
     if (subcmd === 'remove' || subcmd === 'rm') {
         if (!id) {
-            console.error(colors.red('Usage: gotrain favorite remove <station-id|alias>'));
+            console.error(colors.red('Usage: gotrain favs rm <station-id|alias>'));
             process.exit(1);
         }
-        removeFavorite(id);
-        console.log(`${colors.red('Removed')} ${colors.bold(id)} ${colors.red('from favorites')} 🗑️`);
+        const resolved = resolveAlias(id);
+        removeFavorite(resolved);
+        console.log(`${colors.red('Removed')} ${colors.bold(resolved)} ${colors.red('from favorites')} 🗑️`);
         return;
     }
 
-    // Toggle behavior
+    // Toggle behavior for convenience
     const favorites = getFavorites();
-    if (favorites[subcmd] !== undefined) {
-        removeFavorite(subcmd);
-        console.log(`${colors.red('Removed')} ${colors.bold(subcmd)} ${colors.red('from favorites')} 🗑️`);
+    const resolved = resolveAlias(subcmd);
+    if (favorites[resolved] !== undefined) {
+        removeFavorite(resolved);
+        console.log(`${colors.red('Removed')} ${colors.bold(resolved)} ${colors.red('from favorites')} 🗑️`);
     } else {
-        addFavorite(subcmd, id); // id here would be alias if user did: gotrain favorite ID ALIAS
-        console.log(`${colors.green('Added')} ${colors.bold(subcmd)} ${colors.green('to favorites')} ✅`);
+        addFavorite(resolved, id); // id here would be alias
+        console.log(`${colors.green('Added')} ${colors.bold(resolved)} ${colors.green('to favorites')}${id ? ` (Alias: ${id})` : ''} ✅`);
     }
 }
 
@@ -42,7 +44,7 @@ export async function cmdFavs() {
     const stationIds = Object.keys(favorites);
 
     if (stationIds.length === 0) {
-        console.log("No favorites yet. Use 'gotrain favorite <id>' to add.");
+        console.log("No favorites yet. Use 'gotrain favs add <id>' to add.");
         return;
     }
 

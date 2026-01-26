@@ -1,12 +1,19 @@
-
-import { format, parseISO } from 'date-fns';
 import chalk from 'chalk';
 
-export function formatTime(isoString: string | null | undefined, fmt: string = 'h:mm a zzz'): string {
+export function formatTime(isoString: string | null | undefined, fmt?: string): string {
     if (!isoString || isoString === 'null') return '--';
     try {
-        const date = parseISO(isoString);
-        return format(date, fmt);
+        const date = new Date(isoString);
+        if (isNaN(date.getTime())) return isoString;
+
+        const options: Intl.DateTimeFormatOptions = {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true,
+            timeZoneName: 'short'
+        };
+
+        return new Intl.DateTimeFormat('en-US', options).format(date);
     } catch (e) {
         return isoString;
     }

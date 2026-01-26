@@ -1,5 +1,4 @@
 
-import axios from 'axios';
 import Conf from 'conf';
 import path from 'path';
 import fs from 'fs';
@@ -67,9 +66,10 @@ export async function fetchWithCache<T>(endpoint: string, ttl: number = CACHE_TT
     }
   }
 
-  const response = await axios.get(`${API_BASE}${endpoint}`);
-  fs.writeFileSync(cacheFile, JSON.stringify(response.data));
-  return response.data;
+  const response = await fetch(`${API_BASE}${endpoint}`);
+  const data = await response.json() as T;
+  fs.writeFileSync(cacheFile, JSON.stringify(data));
+  return data;
 }
 
 export async function getStations(): Promise<Station[]> {
@@ -81,10 +81,11 @@ export async function getStations(): Promise<Station[]> {
     return JSON.parse(fs.readFileSync(stationsFile, 'utf-8'));
   }
 
-  const response = await axios.get(`${API_BASE}/stations`);
-  fs.writeFileSync(stationsFile, JSON.stringify(response.data));
+  const response = await fetch(`${API_BASE}/stations`);
+  const data = await response.json() as Station[];
+  fs.writeFileSync(stationsFile, JSON.stringify(data));
   config.set('lastStationsUpdate', now);
-  return response.data;
+  return data;
 }
 
 export async function getDepartures(stationId: string): Promise<Departure[]> {

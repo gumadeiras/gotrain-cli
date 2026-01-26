@@ -42,13 +42,11 @@ Commands:
   departures <id> [--to <id>]  Show departures (from id, optionally to id)
   arrivals <id> [--from <id>]  Show arrivals (at id, optionally from id)
   alerts                       Show active service alerts
-  favorite <id|add|rm> [alias] Add/remove station in favorites (optional alias)
-  favs                         List favorite stations
+  favs [add|rm] [id] [alias]   List, add, or remove favorite stations
 
 Examples:
   gotrain stations "new haven"
-  gotrain departures MNR-149
-  gotrain favorite add MNR-149 nh
+  gotrain favs add MNR-149 nh
   gotrain departures nh --to MNR-1
 
 EOF
@@ -538,34 +536,29 @@ cmd_alerts() {
   done
 }
 
-cmd_favorite() {
+cmd_favs() {
   local subcmd="${1:-}"
   local id="${2:-}"
   local alias="${3:-}"
   local fav_file="$CACHE_DIR/favorites"
   [[ ! -f "$fav_file" ]] && touch "$fav_file"
 
-  # Helper to remove an ID from file (handles ID and ID|ALIAS)
+  # Helper to remove an ID from file
   remove_station_from_favs() {
     local station_id="$1"
     local tmp_file="$fav_file.tmp"
-    # Filter out lines where the first field (ID) matches matches the target
     awk -F'|' -v tid="$station_id" '$1 != tid' "$fav_file" > "$tmp_file" && mv "$tmp_file" "$fav_file"
   }
 
   # Helper to check if ID exists
   station_exists_in_favs() {
     local station_id="$1"
-    # Matches START-OF-LINE + ID + (End-of-line OR Pipe)
     grep -E "^$station_id(\||$)" "$fav_file" >/dev/null 2>&1
   }
 
-  # Handle subcommands
   if [[ "$subcmd" == "add" ]]; then
-     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favorite add <station-id> [alias]${NC}"; exit 1; }
-     
+     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favs add <station-id> [alias]${NC}"; exit 1; }
      if station_exists_in_favs "$id"; then
-       # Remove old entry first to ensure no duplicates/updates alias
        remove_station_from_favs "$id"
        echo "$id|$alias" >> "$fav_file"
        echo -e "${GREEN}Updated favorite ${BOLD}$id${NC}${GREEN} with alias '${BOLD}$alias${NC}' ${NC}✅"
@@ -575,61 +568,38 @@ cmd_favorite() {
      fi
      return
   elif [[ "$subcmd" == "remove" || "$subcmd" == "rm" ]]; then
-     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favorite remove <station-id|alias>${NC}"; exit 1; }
-     
-     # Resolve alias if user passed alias to remove
+     [[ -z "$id" ]] && { echo -e "${RED}Usage: gotrain favs rm <station-id|alias>${NC}"; exit 1; }
      local resolved=$(resolve_alias "$id")
-     local remove_id="$resolved"
-     
-     if station_exists_in_favs "$remove_id"; then
-       remove_station_from_favs "$remove_id"
-       echo -e "${RED}Removed ${BOLD}$remove_id${NC}${RED} from favorites ${NC}🗑️"
+     if station_exists_in_favs "$resolved"; then
+       remove_station_from_favs "$resolved"
+       echo -e "${RED}Removed ${BOLD}$resolved${NC}${RED} from favorites ${NC}🗑️"
      else
        echo -e "${YELLOW}Station ${BOLD}$id${NC}${YELLOW} is not in favorites.${NC}"
      fi
      return
+  elif [[ -n "$subcmd" && "$subcmd" != "list" ]]; then
+    # Toggle behavior for convenience
+    local resolved=$(resolve_alias "$subcmd")
+    if station_exists_in_favs "$resolved"; then
+      remove_station_from_favs "$resolved"
+      echo -e "${RED}Removed ${BOLD}$resolved${NC}${RED} from favorites ${NC}🗑️"
+    else
+      echo "$resolved|$id" >> "$fav_file"
+      echo -e "${GREEN}Added ${BOLD}$resolved${NC}${GREEN} to favorites${id:+ (Alias: $id)} ${NC}✅"
+    fi
+    return
   fi
 
-  # Default Toggle Behavior
-  id="$subcmd"
-  [[ -z "$id" ]] && { 
-    echo -e "${RED}Usage: gotrain favorite <id|add|remove> [alias]${NC}"
-    echo ""
-    echo "Examples:"
-    echo "  gotrain favorite add MNR-149 home   # Add with alias"
-    echo "  gotrain favorite rm home            # Remove by alias"
-    echo "  gotrain favorite MNR-124            # Toggle (add/remove)"
-    echo "  gotrain favs                        # List all favorites"
-    exit 1
-  }
-  
-  local resolved=$(resolve_alias "$id")
-  if station_exists_in_favs "$resolved"; then
-    remove_station_from_favs "$resolved"
-    echo -e "${RED}Removed ${BOLD}$resolved${NC}${RED} from favorites ${NC}🗑️"
-  else
-    echo "$resolved|" >> "$fav_file"
-    echo -e "${GREEN}Added ${BOLD}$resolved${NC}${GREEN} to favorites ${NC}✅"
-  fi
-}
-
-cmd_favs() {
+  # Default: List
   echo -e "${BOLD}${BLUE}Favorite Stations${NC}"
   echo -e "${DIM}──────────────────────────────────────────────────────────${NC}"
-
-  local fav_file="$CACHE_DIR/favorites"
-  [[ ! -s "$fav_file" ]] && { echo "No favorites yet. Use 'gotrain favorite <id>' to add."; exit 0; }
-
+  [[ ! -s "$fav_file" ]] && { echo "No favorites yet. Use 'gotrain favs add <id>' to add."; exit 0; }
   update_stations_cache
-
-  while IFS='|' read -r id alias; do
-    [[ -z "$id" ]] && continue
-    # Look up from local cache instead of API
-    cat "$STATIONS_CACHE" | jq -r --arg id "$id" '.[] | select(.id == $id) | "\(.id)|\(.name)|\(.system)"' 2>/dev/null | while IFS='|' read -r sid name system; do
-      
+  while IFS='|' read -r fid falias; do
+    [[ -z "$fid" ]] && continue
+    cat "$STATIONS_CACHE" | jq -r --arg id "$fid" '.[] | select(.id == $id) | "\(.id)|\(.name)|\(.system)"' 2>/dev/null | while IFS='|' read -r sid name system; do
       local alias_display=""
-      [[ -n "$alias" ]] && alias_display=" ${MAGENTA}(Alias: $alias)${NC}"
-      
+      [[ -n "$falias" ]] && alias_display=" ${MAGENTA}(Alias: $falias)${NC}"
       case "$system" in
         SUBWAY) echo -e "🟦 ${BOLD}SUBWAY${NC} | $name ${DIM}($sid)${NC}${alias_display}" ;;
         LIRR) echo -e "🟩 ${BOLD}LIRR${NC}   | $name ${DIM}($sid)${NC}${alias_display}" ;;
@@ -648,8 +618,7 @@ case "$1" in
   departures|d) shift; cmd_departures "$@" ;;
   arrivals|ar) shift; cmd_arrivals "$@" ;;
   alerts|a) shift; cmd_alerts "$@" ;;
-  favorite|fav|favorites) shift; cmd_favorite "$@" ;;
-  favs) cmd_favs ;;
+  favs|fav|favorite|favorites) shift; cmd_favs "$@" ;;
   -h|--help|help) usage ;;
   *) echo "Unknown command: $1"; usage ;;
 esac

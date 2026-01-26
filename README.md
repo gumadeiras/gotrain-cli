@@ -41,9 +41,9 @@ gotrain arrivals MNR-1 --from nh # Filter arrivals from New Haven
 gotrain alerts              # Active service alerts
 
 # Favorites
-gotrain favorite add MNR-149 nh  # Add with alias 'nh'
-gotrain favorite rm nh           # Remove by alias
-gotrain favs                     # List favorite stations
+gotrain favs add MNR-149 nh  # Add with alias 'nh'
+gotrain favs rm nh           # Remove by alias
+gotrain favs                 # List favorite stations
 ```
 
 ### Examples
@@ -83,8 +83,7 @@ gotrain favs                     # List favorite stations
 | `departures <id> [--to <id>]` | Show departures (optional destination filter) |
 | `arrivals <id> [--from <id>]` | Show arrivals (optional origin filter) |
 | `alerts [--station <id>] [--all]` | Active service alerts (optional station filter, all alerts) |
-| `favorite <id\|add\|rm> [alias]` | Add/remove/toggle favorites |
-| `favs` | List favorite stations |
+| `favs [add|rm] [id] [alias]` | Manage favorites (list, add, remove, toggle) |
 
 ## Clawdbot Integration
 
