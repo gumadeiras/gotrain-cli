@@ -14,7 +14,12 @@ Most train apps are bloated. This is one shell script.
 
 ## Install
 
-**One-liner (macOS/Linux):**
+**Via npm (Recommended):**
+```bash
+npm install -g gotrain-cli
+```
+
+**One-liner (Universal Bash):**
 ```bash
 curl -sL https://raw.githubusercontent.com/gumadeiras/gotrain-cli/main/install.sh | bash
 ```

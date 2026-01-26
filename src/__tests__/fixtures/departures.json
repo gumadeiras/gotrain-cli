@@ -1,0 +1,35 @@
+[
+    {
+        "routeShortName": "NH",
+        "routeLongName": "New Haven",
+        "destination": "New Haven",
+        "departureTime": "2023-10-27T14:00:00Z",
+        "status": "On Time",
+        "track": "14",
+        "peakStatus": "Off Peak",
+        "tripId": "1001",
+        "direction": "Outbound"
+    },
+    {
+        "routeShortName": "HUD",
+        "routeLongName": "Hudson",
+        "destination": "Poughkeepsie",
+        "departureTime": "2023-10-27T14:15:00Z",
+        "status": "Delayed",
+        "track": "18",
+        "peakStatus": "Off Peak",
+        "tripId": "2002",
+        "direction": "Outbound"
+    },
+    {
+        "routeShortName": "HAR",
+        "routeLongName": "Harlem",
+        "destination": "North White Plains",
+        "departureTime": "2023-10-27T14:30:00Z",
+        "status": "Cancelled",
+        "track": null,
+        "peakStatus": "Peak",
+        "tripId": "3003",
+        "direction": "Outbound"
+    }
+]
