@@ -7,11 +7,12 @@ import { cmdAlerts } from './commands/alerts';
 import { cmdFavorite, cmdFavs } from './commands/favorites';
 
 const program = new Command();
+const pkg = require('../package.json') as { version: string };
 
 program
     .name('gotrain')
     .description('Atomic CLI for NYC train departures (MTA, LIRR, MNR)')
-    .version('1.0.0');
+    .version(pkg.version);
 
 program
     .command('stations')

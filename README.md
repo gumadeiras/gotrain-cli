@@ -57,10 +57,17 @@ gotrain favs                 # List favorite stations
  Departures for New Haven (MNR-149)
  ──────────────────────────────────────────────────────────
  10:39 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
-              │ On Time        Track 1 (Train #1539)
+              │ On Time        Track 1 • Ride 2h 04m (Train #1539)
  
  11:24 AM EST │ Grand Central  (Off Peak) [Line: New Haven]
-              │ On Time        Track 2 (Train #1545)
+              │ On Time        Track 2 • Ride 2h 01m (Train #1545)
+
+ $ gotrain arrivals MNR-1 --from nh
+ Arrivals for Grand Central (MNR-1)
+ Origin: New Haven (MNR-149)
+ ──────────────────────────────────────────────────────────
+ 12:43 PM EST │ Grand Central  (Off Peak) [Line: New Haven]
+              │ On Time        No Track • Dep 10:39 AM EST • Ride 2h 04m (Train #1539)
  
  $ gotrain favorite add MNR-149 home
  Added MNR-149 to favorites (Alias: home) ✅
