@@ -29,15 +29,33 @@ describe('Board Command (Departures/Arrivals)', () => {
     });
 
     test('renders departures correctly', async () => {
-        (getDepartures as jest.Mock).mockResolvedValue([
-            {
-                departureTime: '2026-01-25T22:00:00Z',
-                destination: 'New Haven',
-                status: 'On Time',
-                track: '14',
-                tripId: '123'
+        (getDepartures as jest.Mock).mockImplementation(async (stationId: string) => {
+            if (stationId === 'MNR-1') {
+                return [
+                    {
+                        departureTime: '2026-01-25T22:00:00Z',
+                        destination: 'New Haven',
+                        status: 'On Time',
+                        track: '14',
+                        tripId: '123'
+                    }
+                ];
             }
-        ]);
+
+            if (stationId === 'MNR-149') {
+                return [
+                    {
+                        departureTime: '2026-01-25T23:45:00Z',
+                        destination: 'New Haven',
+                        status: 'On Time',
+                        track: '5',
+                        tripId: '123'
+                    }
+                ];
+            }
+
+            return [];
+        });
 
         await cmdBoard('MNR-1', 'departures');
 
@@ -45,6 +63,7 @@ describe('Board Command (Departures/Arrivals)', () => {
         expect(output).toContain('Departures for Grand Central (MNR-1)');
         expect(output).toContain('New Haven');
         expect(output).toContain('Track 14');
+        expect(output).toContain('Ride 1h 45m');
         expect(output).toContain('Train #123');
     });
 
@@ -59,5 +78,47 @@ describe('Board Command (Departures/Arrivals)', () => {
         const output = stripAnsi(logSpy.mock.calls.map(call => call[0]).join('\n'));
         expect(output).toContain('New Haven');
         expect(output).not.toContain('Stamford');
+    });
+
+    test('renders departure time and duration for arrivals filtered by origin', async () => {
+        (getDepartures as jest.Mock).mockImplementation(async (stationId: string) => {
+            if (stationId === 'MNR-1') {
+                return [
+                    {
+                        departureTime: '2026-01-25T22:00:00Z',
+                        destination: 'Grand Central',
+                        status: 'On Time',
+                        track: '14',
+                        tripId: '123',
+                        routeLongName: 'New Haven',
+                        direction: 'Inbound'
+                    }
+                ];
+            }
+
+            if (stationId === 'MNR-149') {
+                return [
+                    {
+                        departureTime: '2026-01-25T20:10:00Z',
+                        destination: 'Grand Central',
+                        status: 'On Time',
+                        track: '1',
+                        tripId: '123',
+                        routeLongName: 'New Haven',
+                        direction: 'Inbound'
+                    }
+                ];
+            }
+
+            return [];
+        });
+
+        await cmdBoard('MNR-1', 'arrivals', 'MNR-149');
+
+        const output = stripAnsi(logSpy.mock.calls.map(call => call[0]).join('\n'));
+        expect(output).toContain('Arrivals for Grand Central (MNR-1)');
+        expect(output).toContain('Origin: New Haven (MNR-149)');
+        expect(output).toContain('Dep 2026-01-25T20:10:00Z');
+        expect(output).toContain('Ride 1h 50m');
     });
 });

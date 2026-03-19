@@ -4,10 +4,11 @@ import subprocess
 import tempfile
 import unittest
 
-# Path to the project root
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEST_FILE = os.path.abspath(__file__)
+TESTS_ROOT = os.path.dirname(TEST_FILE)
+PROJECT_ROOT = os.path.dirname(os.path.dirname(TESTS_ROOT))
 GOTRAIN_BIN = os.path.join(PROJECT_ROOT, "gotrain")
-TESTS_BIN = os.path.join(PROJECT_ROOT, "tests", "bin")
+TESTS_BIN = os.path.join(TESTS_ROOT, "bin")
 
 class TestGoTrain(unittest.TestCase):
     def setUp(self):
@@ -82,7 +83,7 @@ class TestGoTrain(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         output = self.strip_ansi(result.stdout)
         self.assertIn("Hudson Line Delays", output)
-        self.assertIn("Showing top 10 of 2", output)
+        self.assertIn("Showing top 2 of 2", output)
         
         # Test filtering
         result = self.run_gotrain(["alerts", "--station", "Grand Central"])

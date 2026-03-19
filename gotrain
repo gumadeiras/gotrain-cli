@@ -152,6 +152,64 @@ get_station_name() {
   cat "$STATIONS_CACHE" | jq -r --arg id "$id" '.[] | select(.id == $id) | .name' 2>/dev/null
 }
 
+get_station_system() {
+  local id="$1"
+  cat "$STATIONS_CACHE" | jq -r --arg id "$id" '.[] | select(.id == $id) | .system' 2>/dev/null
+}
+
+resolve_station_id_by_name() {
+  local station_name="$1"
+  local preferred_system="${2:-}"
+
+  cat "$STATIONS_CACHE" | jq -r --arg NAME "$station_name" --arg SYSTEM "$preferred_system" '
+    def matches_name: ((.name // "") | ascii_downcase) == ($NAME | ascii_downcase);
+
+    ([ .[] | select(matches_name and ($SYSTEM == "" or .system == $SYSTEM)) | .id ][0])
+    // ([ .[] | select(matches_name) | .id ][0])
+    // empty
+  ' 2>/dev/null
+}
+
+iso_to_epoch() {
+  local dt="$1"
+  [[ -z "$dt" || "$dt" == "null" ]] && return
+
+  local clean_dt
+  clean_dt=$(echo "$dt" | sed -E 's/\.[0-9]+Z$/+0000/; s/Z$/+0000/')
+
+  local epoch
+  if epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S%z" "$clean_dt" "+%s" 2>/dev/null); then
+    echo "$epoch"
+  elif epoch=$(date -d "$dt" "+%s" 2>/dev/null); then
+    echo "$epoch"
+  fi
+}
+
+format_duration() {
+  local start_time="$1"
+  local end_time="$2"
+
+  local start_epoch
+  local end_epoch
+  start_epoch=$(iso_to_epoch "$start_time")
+  end_epoch=$(iso_to_epoch "$end_time")
+
+  [[ -z "$start_epoch" || -z "$end_epoch" ]] && return
+
+  local diff_seconds=$((end_epoch - start_epoch))
+  [[ "$diff_seconds" -le 0 ]] && return
+
+  local total_minutes=$(((diff_seconds + 30) / 60))
+  local hours=$((total_minutes / 60))
+  local minutes=$((total_minutes % 60))
+
+  if [[ "$hours" -eq 0 ]]; then
+    echo "${minutes}m"
+  else
+    printf "%dh %02dm\n" "$hours" "$minutes"
+  fi
+}
+
 resolve_alias() {
   local input="$1"
   local fav_file="$CACHE_DIR/favorites"
@@ -210,9 +268,15 @@ render_board() {
 
 
   local station_name=$(get_station_name "$station_id")
+  local station_system=$(get_station_system "$station_id")
   local display_station="$station_id"
   if [[ -n "$station_name" ]]; then
     display_station="$station_name ($station_id)"
+  fi
+
+  local origin_board=""
+  if [[ "$mode" == "arrivals" && -n "$filter_id" ]]; then
+    origin_board=$(api_fetch "/departures/$filter_id")
   fi
 
   # Construct jq filter safely
@@ -329,14 +393,50 @@ render_board() {
        fi
     fi
 
+    local ride_meta=""
+    if [[ "$mode" == "departures" && -n "$trip_id" ]]; then
+      local dest_station_id
+      dest_station_id=$(resolve_station_id_by_name "$dest" "$station_system")
+
+      if [[ -n "$dest_station_id" ]]; then
+        local dest_stop_time
+        dest_stop_time=$(api_fetch "/departures/$dest_station_id" | jq -r --arg TRIP_ID "$trip_id" '[.[] | select(.tripId == $TRIP_ID)][0].departureTime // empty' 2>/dev/null)
+
+        local ride_duration
+        ride_duration=$(format_duration "$time" "$dest_stop_time")
+        if [[ -n "$ride_duration" ]]; then
+          ride_meta="${DIM}•${NC} ${DIM}Ride $ride_duration${NC}"
+        fi
+      fi
+    fi
+
+    if [[ "$mode" == "arrivals" && -n "$filter_id" && -n "$trip_id" && -n "$origin_board" ]]; then
+      local origin_time
+      origin_time=$(echo "$origin_board" | jq -r --arg TRIP_ID "$trip_id" '[.[] | select(.tripId == $TRIP_ID)][0].departureTime // empty' 2>/dev/null)
+
+      if [[ -n "$origin_time" ]]; then
+        local origin_fmt
+        local ride_duration
+        origin_fmt=$(format_time "$origin_time")
+        ride_duration=$(format_duration "$origin_time" "$time")
+
+        ride_meta="${DIM}•${NC} ${DIM}Dep $origin_fmt${NC}"
+        if [[ -n "$ride_duration" ]]; then
+          ride_meta="$ride_meta ${DIM}•${NC} ${DIM}Ride $ride_duration${NC}"
+        fi
+      fi
+    fi
+
     printf "${CYAN}%-12s${NC} ${DIM}│${NC} ${BOLD}%s${NC}${info_str}${line_info}\n" "$time_fmt" "$dest_display"
     
     # Row 2: Status | Track | Trip ID
     local track_display="Track ${BOLD}$track${NC}"
     [[ "$track" == "-" || "$track" == "null" ]] && track_display="${DIM}No Track${NC}"
+    local trip_display=""
+    [[ -n "$trip_id" ]] && trip_display=" ${DIM}(Train #$trip_id)${NC}"
     
     # Time col (12) + Space (1) = 13 spaces indentation
-    printf "             ${DIM}│${NC} ${status_color}%-14s${NC} %b ${DIM}(Train #%s)${NC}\n" "$status" "$track_display" "$trip_id"
+    printf "             ${DIM}│${NC} ${status_color}%-14s${NC} %b%b%b\n" "$status" "$track_display" "${ride_meta:+ $ride_meta}" "$trip_display"
     echo ""
   done
 }
