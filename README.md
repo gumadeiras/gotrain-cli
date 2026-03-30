@@ -1,5 +1,7 @@
 # gotrain 🚂
 
+![gotrain terminal preview](assets/gotrain.jpg)
+
 > Atomic CLI for MTA system train departures (NYC Subway, LIRR, Metro-North)
 
 No dependencies. No config. Just trains.
@@ -7,8 +9,6 @@ No dependencies. No config. Just trains.
 ![CI](https://img.shields.io/badge/CI-bash--only-yellow)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
-
-![gotrain terminal preview](assets/gotrain.jpg)
 
 ## Why?
 
