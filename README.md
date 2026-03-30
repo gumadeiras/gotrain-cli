@@ -8,6 +8,8 @@ No dependencies. No config. Just trains.
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![gotrain terminal preview](assets/gotrain.jpg)
+
 ## Why?
 
 Most train apps are bloated. This is one shell script.
