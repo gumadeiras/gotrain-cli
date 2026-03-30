@@ -1,4 +1,4 @@
-![gotrain terminal preview](assets/gotrain.jpg)
+<img src="assets/gotrain.jpg" alt="gotrain terminal preview" width="280" />
 
 # gotrain 🚂
 
