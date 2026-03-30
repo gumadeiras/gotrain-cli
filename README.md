@@ -1,6 +1,6 @@
 <img src="assets/gotrain.jpg" alt="gotrain terminal preview" width="280" />
 
-# gotrain 🚂
+# 🚂 gotrain
 
 > Atomic CLI for MTA system train departures (NYC Subway, LIRR, Metro-North)
 
