@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+DEFAULT_REMOTE="${GOTRAIN_RELEASE_REMOTE:-origin}"
+
+usage() {
+    cat <<'EOF'
+Usage:
+  ./scripts/release check <version>
+  ./scripts/release bump <version>
+  ./scripts/release package <version>
+  ./scripts/release publish <version> [--keep-draft]
+  ./scripts/release run <version> [--keep-draft]
+
+Commands:
+  check     Validate synced versions and run release test gates.
+  bump      Update version files only.
+  package   Build and package release artifacts locally.
+  publish   Wait for the GitHub release workflow for v<version> and optionally publish it.
+  run       Bump, test, package, commit, tag, push, wait for the workflow, and publish.
+EOF
+}
+
+die() {
+    echo "error: $*" >&2
+    exit 1
+}
+
+require_tool() {
+    command -v "$1" >/dev/null 2>&1 || die "missing required tool: $1"
+}
+
+require_clean_tree() {
+    local status
+    status="$(git -C "$ROOT_DIR" status --short)"
+    if [[ -n "$status" ]]; then
+        echo "$status" >&2
+        die "working tree must be clean"
+    fi
+}
+
+bump_version() {
+    "$ROOT_DIR/scripts/sync-version.sh" "$1"
+}
+
+run_checks() {
+    local version="$1"
+
+    "$ROOT_DIR/scripts/sync-version.sh" --check "$version"
+
+    (
+        cd "$ROOT_DIR"
+        npm test
+        npm run build
+    )
+}
+
+package_release() {
+    (
+        cd "$ROOT_DIR"
+        "$ROOT_DIR/scripts/package-release.sh" --skip-build
+    )
+}
+
+commit_tag_and_push() {
+    local version="$1"
+    local tag="v$version"
+
+    (
+        cd "$ROOT_DIR"
+        git add package.json package-lock.json
+        git commit -m "Bump version to $version"
+        git tag "$tag"
+        git push "$DEFAULT_REMOTE" HEAD
+        git push "$DEFAULT_REMOTE" "$tag"
+    )
+}
+
+wait_for_release_run() {
+    local tag="$1"
+    local run_id=""
+
+    for _ in {1..20}; do
+        run_id="$(cd "$ROOT_DIR" && gh run list \
+            --workflow release.yml \
+            --branch "$tag" \
+            --event push \
+            --json databaseId \
+            --jq '.[0].databaseId // empty' \
+            --limit 1)"
+        if [[ -n "$run_id" ]]; then
+            break
+        fi
+        sleep 3
+    done
+
+    [[ -n "$run_id" ]] || die "could not find GitHub Actions release run for $tag"
+
+    (
+        cd "$ROOT_DIR"
+        gh run watch "$run_id" --exit-status
+    )
+}
+
+publish_release() {
+    local version="$1"
+    local keep_draft="$2"
+    local tag="v$version"
+
+    require_tool gh
+    (
+        cd "$ROOT_DIR"
+        gh auth status >/dev/null
+    )
+
+    wait_for_release_run "$tag"
+
+    if (( keep_draft )); then
+        (
+            cd "$ROOT_DIR"
+            gh release view "$tag" >/dev/null
+        )
+        echo "Release $tag workflow finished; release state was left unchanged."
+        return 0
+    fi
+
+    (
+        cd "$ROOT_DIR"
+        gh release edit "$tag" --draft=false >/dev/null
+    )
+    echo "Published release $tag."
+}
+
+MODE="${1:-}"
+[[ -n "$MODE" ]] || {
+    usage >&2
+    exit 2
+}
+shift
+
+VERSION=""
+KEEP_DRAFT=0
+
+case "$MODE" in
+    check | bump | package)
+        [[ $# -eq 1 ]] || {
+            usage >&2
+            exit 2
+        }
+        VERSION="$1"
+        ;;
+    publish | run)
+        [[ $# -ge 1 && $# -le 2 ]] || {
+            usage >&2
+            exit 2
+        }
+        VERSION="$1"
+        shift
+        if [[ "${1:-}" == "--keep-draft" ]]; then
+            KEEP_DRAFT=1
+        elif [[ $# -gt 0 ]]; then
+            usage >&2
+            exit 2
+        fi
+        ;;
+    *)
+        usage >&2
+        exit 2
+        ;;
+esac
+
+case "$MODE" in
+    check)
+        run_checks "$VERSION"
+        ;;
+    bump)
+        require_clean_tree
+        bump_version "$VERSION"
+        ;;
+    package)
+        run_checks "$VERSION"
+        package_release
+        ;;
+    publish)
+        publish_release "$VERSION" "$KEEP_DRAFT"
+        ;;
+    run)
+        require_clean_tree
+        require_tool gh
+        bump_version "$VERSION"
+        run_checks "$VERSION"
+        package_release
+        commit_tag_and_push "$VERSION"
+        publish_release "$VERSION" "$KEEP_DRAFT"
+        ;;
+esac

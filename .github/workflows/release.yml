@@ -1,0 +1,81 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Derive release version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          echo "GOTRAIN_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check version files
+        run: ./scripts/sync-version.sh --check "$GOTRAIN_RELEASE_VERSION"
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build package
+        run: npm run build
+
+      - name: Package release assets
+        run: ./scripts/package-release.sh --skip-build
+
+      - name: Write release notes
+        run: |
+          PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
+
+          printf '%s\n' \
+            "gotrain ${GOTRAIN_RELEASE_VERSION}" \
+            "" \
+            "Assets:" \
+            "- \`${PACKAGE_FILE}\`: npm package tarball" \
+            "- \`SHA256SUMS.txt\`: SHA-256 checksum for the tarball" \
+            "" \
+            "Install:" \
+            "- \`npm install -g ./${PACKAGE_FILE}\`" \
+            > dist/release/RELEASE_NOTES.md
+
+      - name: Publish draft GitHub release
+        run: |
+          PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" \
+              "dist/release/${PACKAGE_FILE}" \
+              dist/release/SHA256SUMS.txt \
+              --clobber
+            gh release edit "$GITHUB_REF_NAME" \
+              --draft \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file dist/release/RELEASE_NOTES.md
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              "dist/release/${PACKAGE_FILE}" \
+              dist/release/SHA256SUMS.txt \
+              --draft \
+              --title "$GITHUB_REF_NAME" \
+              --notes-file dist/release/RELEASE_NOTES.md
+          fi

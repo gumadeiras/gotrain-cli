@@ -106,8 +106,14 @@ Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time MTA 
  
  PRs are welcome! If you find any bugs or have feature requests, please [open an issue](https://github.com/gumadeiras/gotrain-cli/issues/new).
 
- - **Development**: Run `./tests/test_gotrain.py` to verify changes locally.
- - **Style**: Keep the script atomic. No external dependencies if possible.
+ - **Development**: Run `npm test` and `npm run build` to verify changes locally.
+ - **Style**: Keep the CLI small and direct.
+
+## Scripts
+
+- `./scripts/committer "message" path...`: stage only the listed paths and create a commit
+- `./scripts/release check 1.2.0`: verify synced release versions and run the release test gates
+- `./scripts/release run 1.2.0`: bump versions, run tests, package artifacts, tag, push, and publish the GitHub release
 
  ## License
 
