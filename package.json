@@ -1,6 +1,6 @@
 {
   "name": "gotrain-cli",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Atomic CLI for MTA system train departures (NYC Subway, LIRR, Metro-North)",
   "main": "dist/index.js",
   "bin": {
