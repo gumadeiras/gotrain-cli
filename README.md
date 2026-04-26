@@ -16,7 +16,13 @@ Most train apps are bloated. This is one shell script.
 
 ## Install
 
-**Via npm (Recommended):**
+**Via Homebrew:**
+```bash
+brew tap gumadeiras/tap
+brew install gotrain-cli
+```
+
+**Via npm:**
 ```bash
 npm install -g gotrain-cli
 ```
@@ -114,8 +120,8 @@ Powered by [MetroFlow API](https://metroflow.ainslie.digital) — real-time MTA 
 ## Scripts
 
 - `./scripts/committer "message" path...`: stage only the listed paths and create a commit
-- `./scripts/release check 1.2.0`: verify synced release versions and run the release test gates
-- `./scripts/release run 1.2.0`: bump versions, run tests, package artifacts, tag, push, and publish the GitHub release
+- `./scripts/release check 1.2.1`: verify synced release versions and run the release test gates
+- `./scripts/release run 1.2.1`: bump versions, run tests, package artifacts, tag, push, and publish the GitHub release
 
  ## License
 
