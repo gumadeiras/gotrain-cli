@@ -7,12 +7,14 @@ on:
 
 permissions:
   contents: write
+  id-token: write
 
 jobs:
   release:
     runs-on: macos-15
     env:
       GH_TOKEN: ${{ github.token }}
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -22,11 +24,22 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          registry-url: https://registry.npmjs.org
 
       - name: Derive release version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           echo "GOTRAIN_RELEASE_VERSION=$VERSION" >> "$GITHUB_ENV"
+
+      - name: Update npm
+        run: npm install -g npm@latest
+
+      - name: Check tap token
+        run: |
+          if [ -z "$TAP_TOKEN" ]; then
+            echo "missing HOMEBREW_TAP_TOKEN secret" >&2
+            exit 1
+          fi
 
       - name: Install dependencies
         run: npm ci
@@ -58,7 +71,7 @@ jobs:
             "- \`npm install -g ./${PACKAGE_FILE}\`" \
             > dist/release/RELEASE_NOTES.md
 
-      - name: Publish draft GitHub release
+      - name: Publish GitHub release
         run: |
           PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
 
@@ -68,14 +81,60 @@ jobs:
               dist/release/SHA256SUMS.txt \
               --clobber
             gh release edit "$GITHUB_REF_NAME" \
-              --draft \
+              --draft=false \
               --title "$GITHUB_REF_NAME" \
               --notes-file dist/release/RELEASE_NOTES.md
           else
             gh release create "$GITHUB_REF_NAME" \
               "dist/release/${PACKAGE_FILE}" \
               dist/release/SHA256SUMS.txt \
-              --draft \
               --title "$GITHUB_REF_NAME" \
               --notes-file dist/release/RELEASE_NOTES.md
           fi
+
+      - name: Publish npm package
+        run: |
+          package_name="$(node -p 'require("./package.json").name')"
+          PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
+
+          if npm view "${package_name}@${GOTRAIN_RELEASE_VERSION}" version >/dev/null 2>&1; then
+            echo "${package_name}@${GOTRAIN_RELEASE_VERSION} already exists on npm"
+            exit 0
+          fi
+
+          npm publish "dist/release/${PACKAGE_FILE}" --access public --provenance
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: gumadeiras/homebrew-tap
+          token: ${{ env.TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update Homebrew formula
+        run: |
+          PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
+          sha256="$(awk -v file="$PACKAGE_FILE" '$2 == file { print $1 }' dist/release/SHA256SUMS.txt)"
+          if [ -z "$sha256" ]; then
+            echo "missing checksum for $PACKAGE_FILE" >&2
+            exit 1
+          fi
+
+          python homebrew-tap/scripts/update_formula.py \
+            --formula homebrew-tap/Formula/gotrain-cli.rb \
+            --url "https://github.com/gumadeiras/gotrain-cli/releases/download/v${GOTRAIN_RELEASE_VERSION}/${PACKAGE_FILE}" \
+            --sha256 "$sha256"
+
+      - name: Commit and push formula
+        working-directory: homebrew-tap
+        run: |
+          if git diff --quiet -- Formula/gotrain-cli.rb; then
+            echo "Formula/gotrain-cli.rb already up to date"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/gotrain-cli.rb
+          git commit -m "Update gotrain-cli to ${GOTRAIN_RELEASE_VERSION}"
+          git push
