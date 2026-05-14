@@ -55,6 +55,7 @@ jobs:
 
       - name: Write release notes
         run: |
+          # shellcheck disable=SC2016
           PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
 
           printf '%s\n' \
@@ -70,6 +71,7 @@ jobs:
 
       - name: Publish GitHub release
         run: |
+          # shellcheck disable=SC2016
           PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
 
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
@@ -92,6 +94,7 @@ jobs:
       - name: Publish npm package
         run: |
           package_name="$(node -p 'require("./package.json").name')"
+          # shellcheck disable=SC2016
           PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
 
           if npm view "${package_name}@${GOTRAIN_RELEASE_VERSION}" version >/dev/null 2>&1; then
@@ -110,6 +113,7 @@ jobs:
 
       - name: Update Homebrew formula
         run: |
+          # shellcheck disable=SC2016
           PACKAGE_FILE="$(node -p 'const pkg=require("./package.json"); `${pkg.name.replace(/^@/, "").replace(/\//g, "-")}-${process.env.GOTRAIN_RELEASE_VERSION}.tgz`')"
           sha256="$(awk -v file="$PACKAGE_FILE" '$2 == file { print $1 }' dist/release/SHA256SUMS.txt)"
           if [ -z "$sha256" ]; then
@@ -118,20 +122,20 @@ jobs:
           fi
 
           python homebrew-tap/scripts/update_formula.py \
-            --formula homebrew-tap/Formula/gotrain-cli.rb \
+            --formula homebrew-tap/Formula/gotrain.rb \
             --url "https://github.com/gumadeiras/gotrain-cli/releases/download/v${GOTRAIN_RELEASE_VERSION}/${PACKAGE_FILE}" \
             --sha256 "$sha256"
 
       - name: Commit and push formula
         working-directory: homebrew-tap
         run: |
-          if git diff --quiet -- Formula/gotrain-cli.rb; then
-            echo "Formula/gotrain-cli.rb already up to date"
+          if git diff --quiet -- Formula/gotrain.rb; then
+            echo "Formula/gotrain.rb already up to date"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/gotrain-cli.rb
-          git commit -m "Update gotrain-cli to ${GOTRAIN_RELEASE_VERSION}"
+          git add Formula/gotrain.rb
+          git commit -m "Update gotrain to ${GOTRAIN_RELEASE_VERSION}"
           git push

@@ -19,12 +19,12 @@ Most train apps are bloated. This is one shell script.
 **Via Homebrew:**
 ```bash
 brew tap gumadeiras/tap
-brew install gotrain-cli
+brew install gotrain
 ```
 
 **Via npm:**
 ```bash
-npm install -g gotrain-cli
+npm install -g gotrain
 ```
 
 **One-liner (Universal Bash):**

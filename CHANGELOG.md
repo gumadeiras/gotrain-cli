@@ -9,6 +9,7 @@
 
 ### Changes
 
+- Renamed the published npm and Homebrew package to `gotrain`.
 - Documented the local release wrapper and normalized release workflow naming.
 
 ## 1.2.1 - 2026-03-30

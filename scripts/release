@@ -41,6 +41,14 @@ require_clean_tree() {
     fi
 }
 
+run_actionlint() {
+    if command -v actionlint >/dev/null 2>&1; then
+        (cd "$ROOT_DIR" && actionlint .github/workflows/*.yml)
+    else
+        echo "actionlint not installed; skipping workflow lint."
+    fi
+}
+
 bump_version() {
     "$ROOT_DIR/scripts/sync-version.sh" "$1"
 }
@@ -49,6 +57,7 @@ run_checks() {
     local version="$1"
 
     "$ROOT_DIR/scripts/sync-version.sh" --check "$version"
+    run_actionlint
 
     (
         cd "$ROOT_DIR"
@@ -67,13 +76,16 @@ package_release() {
 commit_tag_and_push() {
     local version="$1"
     local tag="v$version"
+    local branch
 
     (
         cd "$ROOT_DIR"
+        branch="$(git branch --show-current)"
+        [[ -n "$branch" ]] || die "cannot release from detached HEAD"
         git add package.json package-lock.json
         git commit -m "Bump version to $version"
-        git tag "$tag"
-        git push "$DEFAULT_REMOTE" HEAD
+        git tag -a "$tag" -m "$tag"
+        git push "$DEFAULT_REMOTE" "HEAD:refs/heads/$branch"
         git push "$DEFAULT_REMOTE" "$tag"
     )
 }
