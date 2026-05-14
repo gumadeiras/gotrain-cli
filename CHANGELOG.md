@@ -7,6 +7,10 @@
 - Fixed npm, git, and Homebrew installs to use verified release artifacts.
 - Fixed release publishing to use the stable GitHub Actions Node toolchain.
 
+### Changes
+
+- Documented the local release wrapper and normalized release workflow naming.
+
 ## 1.2.1 - 2026-03-30
 
 ### Changes
