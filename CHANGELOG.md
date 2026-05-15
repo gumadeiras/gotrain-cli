@@ -9,6 +9,7 @@
 
 ### Changes
 
+- Added the final `gotrain-cli` release notice. Install `gotrain` now.
 - Documented the local release wrapper and normalized release workflow naming.
 
 ## 1.2.1 - 2026-03-30

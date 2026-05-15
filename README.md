@@ -2,6 +2,9 @@
 
 # 🚂 gotrain
 
+> This package has been renamed. Install `gotrain` now:
+> `npm install -g gotrain`
+
 > Atomic CLI for MTA system train departures (NYC Subway, LIRR, Metro-North)
 
 No dependencies. No config. Just trains.
