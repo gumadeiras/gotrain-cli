@@ -36,4 +36,3 @@ export declare function getFavorites(): Record<string, string>;
 export declare function addFavorite(id: string, alias?: string): void;
 export declare function removeFavorite(idOrAlias: string): void;
 export declare function resolveAlias(input: string): string;
-//# sourceMappingURL=api.d.ts.map

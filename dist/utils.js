@@ -53,4 +53,3 @@ function getAccessIcon(status) {
         return ' ⚠️';
     return '';
 }
-//# sourceMappingURL=utils.js.map

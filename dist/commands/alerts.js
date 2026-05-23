@@ -82,4 +82,3 @@ async function cmdAlerts(options) {
         console.log('');
     });
 }
-//# sourceMappingURL=alerts.js.map

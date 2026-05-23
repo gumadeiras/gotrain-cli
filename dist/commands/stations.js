@@ -18,4 +18,3 @@ async function cmdStations(query) {
         console.log(`${sysIcon} ${utils_1.colors.bold(s.system)} │ ${s.name} ${locInfo}${linesInfo}${accessIcon} ${utils_1.colors.dim('ID: ' + s.id)}`);
     });
 }
-//# sourceMappingURL=stations.js.map

@@ -9,6 +9,7 @@
 
 ### Changes
 
+- Removed generated source maps from the published npm package.
 - Renamed the published npm and Homebrew package to `gotrain`.
 - Documented the local release wrapper and normalized release workflow naming.
 

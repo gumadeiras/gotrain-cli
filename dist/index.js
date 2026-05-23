@@ -97,4 +97,3 @@ program
     }
 });
 program.parse();
-//# sourceMappingURL=index.js.map

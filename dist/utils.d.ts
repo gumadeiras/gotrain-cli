@@ -13,4 +13,3 @@ export declare const colors: {
 };
 export declare function getSystemIcon(system: string): string;
 export declare function getAccessIcon(status?: string): string;
-//# sourceMappingURL=utils.d.ts.map

@@ -144,4 +144,3 @@ async function cmdBoard(stationId, mode, filterId) {
         console.log('');
     });
 }
-//# sourceMappingURL=board.js.map

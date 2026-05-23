@@ -60,4 +60,3 @@ async function cmdFavs() {
         }
     });
 }
-//# sourceMappingURL=favorites.js.map
