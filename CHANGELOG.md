@@ -6,6 +6,7 @@
 
 - Fixed npm, git, and Homebrew installs to use verified release artifacts.
 - Fixed release publishing to use the stable GitHub Actions Node toolchain.
+- Fixed known security advisories in the settings store's dependencies by updating `fast-uri` to 3.1.9 and `ajv` to 8.20.0.
 
 ### Changes
 
